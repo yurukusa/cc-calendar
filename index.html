@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC Calendar — Your Claude Code Activity Heatmap</title>
+<meta name="description" content="GitHub-style activity calendar showing YOU vs AI hours side by side. Ghost Days highlighted. Select your ~/.claude folder. No install needed.">
+<meta property="og:title" content="CC Calendar — YOU vs AI activity heatmap">
+<meta property="og:description" content="A GitHub-style heatmap showing your Claude Code usage alongside your AI's autonomous hours. Free, local, zero-dependency.">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px}
+  .header{text-align:center;margin-bottom:32px}
+  .header h1{font-size:1.6rem;font-weight:700;color:#e6edf3;margin-bottom:6px}
+  .header p{color:#8b949e;font-size:0.9rem}
+  .pick-box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;text-align:center;max-width:860px;width:100%;margin-bottom:20px}
+  .pick-label{color:#8b949e;font-size:0.85rem;margin-bottom:16px}
+  .btn-pick{display:inline-block;background:#21262d;border:1px solid #388bfd;color:#79c0ff;padding:12px 24px;border-radius:8px;font-size:0.95rem;cursor:pointer;transition:background 0.2s;font-weight:500}
+  .btn-pick:hover{background:#2d333b}
+  .status{margin-top:14px;font-size:0.82rem;color:#8b949e;min-height:20px}
+  .status.ok{color:#3fb950}
+  .status.err{color:#f85149}
+  /* results */
+  .results{max-width:860px;width:100%;display:none}
+  .results.visible{display:block}
+  /* stats row */
+  .stats-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .stat-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;flex:1;min-width:120px}
+  .stat-box .n{font-size:1.3rem;font-weight:700}
+  .stat-box .l{font-size:0.72rem;color:#8b949e;margin-top:2px}
+  /* calendar card */
+  .cal-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:16px;overflow-x:auto}
+  .cal-title{font-size:0.75rem;color:#8b949e;font-weight:600;letter-spacing:0.5px;margin-bottom:14px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  /* grid container */
+  .cal-grid-wrapper{display:flex;gap:16px;flex-direction:column}
+  .cal-section{display:flex;gap:6px;align-items:flex-start}
+  .cal-dow-labels{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+  .dow-label{height:11px;line-height:11px;font-size:0.68rem;color:#8b949e;width:28px;text-align:right}
+  .cal-grid{display:flex;gap:2px}
+  .cal-col{display:flex;flex-direction:column;gap:2px}
+  .cal-cell{width:11px;height:11px;border-radius:2px;cursor:default;transition:opacity 0.1s}
+  .cal-cell:hover{opacity:0.8;outline:1px solid rgba(255,255,255,0.3)}
+  /* YOU colors */
+  .you-0{background:#161b22;border:1px solid #21262d}
+  .you-1{background:#0e4429}
+  .you-2{background:#006d32}
+  .you-3{background:#26a641}
+  .you-4{background:#39d353}
+  /* AI colors */
+  .ai-0{background:#161b22;border:1px solid #21262d}
+  .ai-1{background:#1c1f45}
+  .ai-2{background:#2f3a8f}
+  .ai-3{background:#3b82f6}
+  .ai-4{background:#60a5fa}
+  /* Ghost day: AI active, you not */
+  .ghost-cell{background:#e3b34133;border:1px solid #e3b341 !important;box-shadow:0 0 4px rgba(227,179,65,0.3)}
+  /* Month labels */
+  .month-labels{display:flex;gap:2px;margin-bottom:2px;padding-left:34px}
+  .month-label{font-size:0.68rem;color:#8b949e;white-space:nowrap;overflow:hidden}
+  /* Legend */
+  .legend{display:flex;gap:20px;margin-top:14px;font-size:0.75rem;color:#8b949e;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:5px}
+  .leg-cells{display:flex;gap:2px}
+  .leg-cell{width:11px;height:11px;border-radius:2px}
+  /* ghost legend */
+  .ghost-leg{width:11px;height:11px;border-radius:2px;background:#e3b34133;border:1px solid #e3b341}
+  /* share */
+  .share-section{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;margin-bottom:16px}
+  .share-title{font-size:0.8rem;color:#8b949e;margin-bottom:12px}
+  .btn-share{background:#238636;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:600;margin-right:8px;transition:background 0.2s}
+  .btn-share:hover{background:#2ea043}
+  .btn-copy{background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:0.88rem;transition:background 0.2s}
+  .btn-copy:hover{background:#2d333b}
+  .copy-ok{display:none;font-size:0.8rem;color:#3fb950;margin-top:8px}
+  .copy-ok.show{display:block}
+  /* footer */
+  .footer{margin-top:24px;font-size:0.78rem;color:#4b5563;text-align:center;max-width:860px}
+  .footer a{color:#6b7280;text-decoration:none}
+  .footer a:hover{color:#8b949e}
+  input[type=file]{display:none}
+  .cal-row-label{font-size:0.72rem;color:#8b949e;margin-bottom:4px;font-weight:600}
+  .cal-row-label span{margin-right:6px}
+  .cal-you-label{color:#3fb950}
+  .cal-ai-label{color:#60a5fa}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CC Calendar</h1>
+  <p>GitHub-style activity calendar: You vs AI, Ghost Days highlighted</p>
+</div>
+
+<div class="pick-box" id="pickBox">
+  <div class="pick-label">Select your <code>~/.claude</code> folder to see your activity calendar</div>
+  <label class="btn-pick" for="folderInput">Browse My Claude Folder</label>
+  <input type="file" id="folderInput" webkitdirectory multiple accept="">
+  <div class="status" id="status">No data loaded yet</div>
+</div>
+
+<div class="results" id="results">
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="cal-card">
+    <div class="cal-title">
+      <span class="cal-you-label">▮ You</span>
+      <span style="color:#4b5563">vs</span>
+      <span class="cal-ai-label">▮ AI autonomous</span>
+      <span style="color:#4b5563">·</span>
+      <span style="color:#e3b341">👻 Ghost Day</span>
+    </div>
+    <div class="month-labels" id="monthLabels"></div>
+    <div class="cal-grid-wrapper">
+      <div>
+        <div class="cal-row-label"><span class="cal-you-label">You</span> interactive hours</div>
+        <div class="cal-section">
+          <div class="cal-dow-labels" id="dowLabelsYou"></div>
+          <div class="cal-grid" id="calGridYou"></div>
+        </div>
+      </div>
+      <div>
+        <div class="cal-row-label"><span class="cal-ai-label">AI</span> autonomous hours</div>
+        <div class="cal-section">
+          <div class="cal-dow-labels" id="dowLabelsAI"></div>
+          <div class="cal-grid" id="calGridAI"></div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span>You:</span>
+        <div class="leg-cells">
+          <div class="leg-cell you-0" title="none"></div>
+          <div class="leg-cell you-1" title="<1h"></div>
+          <div class="leg-cell you-2" title="1-3h"></div>
+          <div class="leg-cell you-3" title="3-6h"></div>
+          <div class="leg-cell you-4" title=">6h"></div>
+        </div>
+        <span>Less → More</span>
+      </div>
+      <div class="legend-item">
+        <span>AI:</span>
+        <div class="leg-cells">
+          <div class="leg-cell ai-0" title="none"></div>
+          <div class="leg-cell ai-1" title="<1h"></div>
+          <div class="leg-cell ai-2" title="1-3h"></div>
+          <div class="leg-cell ai-3" title="3-6h"></div>
+          <div class="leg-cell ai-4" title=">6h"></div>
+        </div>
+        <span>Less → More</span>
+      </div>
+      <div class="legend-item">
+        <div class="ghost-leg" title="Ghost Day"></div>
+        <span>Ghost Day (AI worked, you didn't)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="share-section">
+    <div class="share-title">Share your activity calendar</div>
+    <button class="btn-share" id="btnShare">Share on Twitter</button>
+    <button class="btn-copy" id="btnCopy">Copy stats</button>
+    <div class="copy-ok" id="copyOk">Copied!</div>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="https://yurukusa.github.io/cc-toolkit/">← All 27 cc-toolkit tools</a> ·
+  <a href="https://github.com/yurukusa/cc-calendar">GitHub</a> ·
+  No data leaves your machine
+</div>
+
+<script>
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+async function _readFirstLast(file) {
+  const CHUNK = 4096;
+  const size = file.size;
+  if (size === 0) return { first: '', last: '' };
+  const dec = new TextDecoder('utf-8', { fatal: false });
+  const headBuf = await file.slice(0, Math.min(CHUNK, size)).arrayBuffer();
+  const headText = dec.decode(new Uint8Array(headBuf));
+  const firstNl = headText.indexOf('\n');
+  const first = firstNl >= 0 ? headText.slice(0, firstNl) : headText;
+  const tailBuf = await file.slice(Math.max(0, size - CHUNK)).arrayBuffer();
+  const tailText = dec.decode(new Uint8Array(tailBuf));
+  const lines = tailText.split('\n').filter(l => l.trim());
+  const last = lines.length > 0 ? lines[lines.length - 1] : first;
+  return { first, last };
+}
+
+function parseTs(line) {
+  try { const o = JSON.parse(line); return o.timestamp ? new Date(o.timestamp) : null; } catch { return null; }
+}
+
+function toLocalDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function buildByDate(fileList) {
+  const byDate = {};
+  const jsonlFiles = Array.from(fileList).filter(f => {
+    const p = f.webkitRelativePath || f.name;
+    return p.endsWith('.jsonl') && p.includes('/projects/');
+  });
+  if (jsonlFiles.length === 0) return null;
+  for (const file of jsonlFiles) {
+    const p = file.webkitRelativePath || file.name;
+    const isSub = p.includes('/subagents/');
+    const { first, last } = await _readFirstLast(file);
+    const t1 = parseTs(first), t2 = parseTs(last);
+    if (!t1 || !t2) continue;
+    const date = toLocalDate(t1);
+    const hours = Math.max(0, (t2 - t1) / 3600000);
+    if (!byDate[date]) byDate[date] = { main: 0, sub: 0 };
+    if (isSub) byDate[date].sub += hours;
+    else byDate[date].main += hours;
+  }
+  return byDate;
+}
+
+function lvl(h) {
+  if (h <= 0) return 0;
+  if (h < 1)  return 1;
+  if (h < 3)  return 2;
+  if (h < 6)  return 3;
+  return 4;
+}
+
+function buildCalGrid(byDate, gridId, dowId, mode) {
+  // Build 52 weeks of calendar (last 52 weeks ending today)
+  const today = new Date();
+  // Find start: 52 weeks ago, adjusted to Sunday
+  const startDay = new Date(today);
+  startDay.setDate(startDay.getDate() - (52 * 7 - 1));
+  startDay.setDate(startDay.getDate() - startDay.getDay()); // back to Sunday
+
+  const weeks = [];
+  let cur = new Date(startDay);
+  while (cur <= today) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(toLocalDate(cur));
+      cur = new Date(cur.getTime() + 86400000);
+    }
+    weeks.push(week);
+  }
+
+  // Month labels
+  if (mode === 'you') {
+    const ml = document.getElementById('monthLabels');
+    ml.innerHTML = '';
+    let lastMonth = -1;
+    weeks.forEach(week => {
+      const d = new Date(week[0]);
+      const m = d.getMonth();
+      const label = document.createElement('div');
+      label.className = 'month-label';
+      label.style.width = '13px'; // 11px cell + 2px gap
+      if (m !== lastMonth) {
+        label.textContent = MONTHS[m];
+        label.style.width = '32px'; // wider for text
+        lastMonth = m;
+      }
+      ml.appendChild(label);
+    });
+  }
+
+  // DOW labels
+  const dowCont = document.getElementById(dowId);
+  dowCont.innerHTML = '';
+  // Show Mon, Wed, Fri
+  for (let d = 0; d < 7; d++) {
+    const label = document.createElement('div');
+    label.className = 'dow-label';
+    label.textContent = (d === 1 || d === 3 || d === 5) ? DOW[d] : '';
+    dowCont.appendChild(label);
+  }
+
+  // Grid
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  for (const week of weeks) {
+    const col = document.createElement('div');
+    col.className = 'cal-col';
+    for (const dateStr of week) {
+      const v = byDate[dateStr] || { main: 0, sub: 0 };
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      const isGhost = v.main === 0 && v.sub > 0;
+      if (mode === 'you') {
+        cell.classList.add(`you-${lvl(v.main)}`);
+        if (isGhost) cell.classList.add('ghost-cell');
+      } else {
+        cell.classList.add(`ai-${lvl(v.sub)}`);
+        if (isGhost) cell.classList.add('ghost-cell');
+      }
+      const mainH = v.main.toFixed(1), subH = v.sub.toFixed(1);
+      const ghostTag = isGhost ? ' 👻 Ghost Day' : '';
+      cell.title = `${dateStr}: You=${mainH}h AI=${subH}h${ghostTag}`;
+      col.appendChild(cell);
+    }
+    grid.appendChild(col);
+  }
+}
+
+let _shareText = '';
+
+function renderResults(byDate) {
+  const dateKeys = Object.keys(byDate).sort();
+  if (dateKeys.length === 0) return;
+
+  let main = 0, sub = 0, ghost = 0, both = 0;
+  for (const dk of dateKeys) {
+    const v = byDate[dk];
+    main += v.main || 0;
+    sub += v.sub || 0;
+    if (v.main > 0 && v.sub > 0) both++;
+    if (v.main === 0 && v.sub > 0) ghost++;
+  }
+  const total = main + sub;
+  const ghostPct = dateKeys.length > 0 ? Math.round(ghost / dateKeys.length * 100) : 0;
+
+  // Stats
+  const sr = document.getElementById('statsRow');
+  sr.innerHTML = `
+    <div class="stat-box"><div class="n" style="color:#3fb950">${main.toFixed(0)}h</div><div class="l">Your hours</div></div>
+    <div class="stat-box"><div class="n" style="color:#60a5fa">${sub.toFixed(0)}h</div><div class="l">AI hours</div></div>
+    <div class="stat-box"><div class="n" style="color:#e3b341">${ghost}</div><div class="l">Ghost Days (${ghostPct}%)</div></div>
+    <div class="stat-box"><div class="n">${dateKeys.length}</div><div class="l">Active days</div></div>
+  `;
+
+  buildCalGrid(byDate, 'calGridYou', 'dowLabelsYou', 'you');
+  buildCalGrid(byDate, 'calGridAI', 'dowLabelsAI', 'ai');
+
+  // Share text
+  _shareText = `My Claude Code activity calendar:\n` +
+    `  You: ${main.toFixed(0)}h  AI: ${sub.toFixed(0)}h\n` +
+    `  👻 ${ghost} Ghost Days (AI worked while I was offline)\n\n` +
+    `#ClaudeCode cc-calendar → yurukusa.github.io/cc-calendar/`;
+
+  document.getElementById('btnShare').onclick = () => {
+    window.open(`https://x.com/intent/tweet?text=${encodeURIComponent(_shareText)}`, '_blank');
+  };
+  document.getElementById('btnCopy').onclick = () => {
+    navigator.clipboard.writeText(_shareText).then(() => {
+      const el = document.getElementById('copyOk');
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2000);
+    });
+  };
+
+  document.getElementById('results').classList.add('visible');
+}
+
+document.getElementById('folderInput').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+  const st = document.getElementById('status');
+  st.textContent = `Reading ${files.length} files...`;
+  st.className = 'status';
+  try {
+    const byDate = await buildByDate(files);
+    if (!byDate || Object.keys(byDate).length === 0) {
+      st.textContent = 'No Claude Code session data found. Make sure you selected the .claude folder.';
+      st.className = 'status err';
+      return;
+    }
+    st.textContent = `Loaded ${Object.keys(byDate).length} days of activity`;
+    st.className = 'status ok';
+    renderResults(byDate);
+  } catch (err) {
+    st.textContent = `Error: ${err.message}`;
+    st.className = 'status err';
+  }
+});
+</script>
+</body>
+</html>
