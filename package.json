@@ -9,10 +9,17 @@
   "scripts": {
     "start": "node cli.mjs"
   },
-  "keywords": ["claude-code", "claude", "ai", "calendar", "developer-tools"],
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "calendar",
+    "developer-tools"
+  ],
   "author": "yurukusa",
   "license": "MIT",
   "engines": {
     "node": ">=18"
-  }
+  },
+  "homepage": "https://github.com/yurukusa/cc-calendar#readme"
 }
